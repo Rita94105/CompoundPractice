@@ -12,7 +12,7 @@ import {FPToken} from "../src/FPToken.sol";
 import {CToken} from "compound-protocol/contracts/CToken.sol";
 
 contract CompoundPractice is Script {
-    // Storage for the comptroller is at this address
+    // Storage for the comptroller is at this address (proxy)
     Unitroller unitroller;
     // interact with cToken, oracle, interestModel
     Comptroller comptroller;
@@ -43,12 +43,12 @@ contract CompoundPractice is Script {
         comptroller = new Comptroller();
         // use SimplePriceOracle as oracle
         oracle = new SimplePriceOracle();
-        // set oracle to comptroller
-        comptroller._setPriceOracle(oracle);
-        // set comptroller to unitroller
+        // unitroller is the proxy of comptroller
         unitroller._setPendingImplementation(address(comptroller));
         // set unitroller to comptroller
         comptroller._become(unitroller);
+        // set oracle to comptroller
+        Comptroller(address(unitroller))._setPriceOracle(oracle);
         // use WhitePaperInterestRateModel as interestModel
         // borrow and loan rates are 0
         interestModel = new WhitePaperInterestRateModel(0,0);
@@ -74,7 +74,7 @@ contract CompoundPractice is Script {
         for (uint i = 0; i < tokens.length; i++) {
             delegators[i] = new CErc20Delegator(
                 tokens[i],
-                comptroller, 
+                Comptroller(address(unitroller)), 
                 interestModel, 
                 1e18, 
                 string(abi.encodePacked("cFPToken", (i+1))),
@@ -83,7 +83,7 @@ contract CompoundPractice is Script {
                 payable(_admin), 
                 address(delegate),
                 new bytes(0)); 
-            comptroller._supportMarket(CToken(address(delegators[i])));
+            Comptroller(address(unitroller))._supportMarket(CToken(address(delegators[i])));
         }
     }
 }
